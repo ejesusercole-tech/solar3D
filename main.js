@@ -1481,6 +1481,66 @@ let followOffset = new THREE.Vector3(10, 5, 10);
 let lastPlanetPosition = new THREE.Vector3();
 let userCameraOffset = new THREE.Vector3();
 
+// Camera transition animation variables
+let cameraTransition = {
+  active: false,
+  startPosition: new THREE.Vector3(),
+  endPosition: new THREE.Vector3(),
+  startTarget: new THREE.Vector3(),
+  endTarget: new THREE.Vector3(),
+  progress: 0,
+  duration: 1.5, // seconds
+  startTime: 0
+};
+
+// Easing function for smooth camera transition (ease-out cubic)
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+// Start camera transition to a target position
+function startCameraTransition(targetPosition, targetLookAt, duration = 1.5) {
+  cameraTransition.active = true;
+  cameraTransition.startPosition.copy(camera.position);
+  cameraTransition.endPosition.copy(targetPosition);
+  cameraTransition.startTarget.copy(controls.target);
+  cameraTransition.endTarget.copy(targetLookAt);
+  cameraTransition.progress = 0;
+  cameraTransition.duration = duration;
+  cameraTransition.startTime = performance.now();
+}
+
+// Update camera transition (called in animate loop)
+function updateCameraTransition() {
+  if (!cameraTransition.active) return;
+  
+  const elapsed = (performance.now() - cameraTransition.startTime) / 1000;
+  cameraTransition.progress = Math.min(elapsed / cameraTransition.duration, 1);
+  
+  const easedProgress = easeOutCubic(cameraTransition.progress);
+  
+  // Interpolate camera position
+  camera.position.lerpVectors(
+    cameraTransition.startPosition,
+    cameraTransition.endPosition,
+    easedProgress
+  );
+  
+  // Interpolate camera target
+  controls.target.lerpVectors(
+    cameraTransition.startTarget,
+    cameraTransition.endTarget,
+    easedProgress
+  );
+  
+  controls.update();
+  
+  // End transition when complete
+  if (cameraTransition.progress >= 1) {
+    cameraTransition.active = false;
+  }
+}
+
 // Eclipse Tour Variables
 let eclipseTourActive = false;
 let eclipseTourPhase = 0;
@@ -1598,6 +1658,9 @@ function animate() {
   if (eclipseTourActive) {
     updateEclipseTour();
   }
+  
+  // Update camera transition animation
+  updateCameraTransition();
 
   if (!isPaused) {
     let realTimeMultiplier = animationSpeed === 0 ? 0.0001 : animationSpeed;
@@ -2245,9 +2308,10 @@ if (planetList) {
           userCameraOffset.set(0, 0, 0);
           const planetPos = new THREE.Vector3();
           planet.mesh.getWorldPosition(planetPos);
-          camera.position.copy(planetPos.clone().add(followOffset));
-          controls.target.copy(planetPos);
-          controls.update();
+          
+          // Smooth camera transition with easing
+          const targetCameraPos = planetPos.clone().add(followOffset);
+          startCameraTransition(targetCameraPos, planetPos, 1.5);
         }
       });
       
@@ -2411,6 +2475,16 @@ function followPlanet(planetIndex) {
   lastPlanetPosition.set(0, 0, 0);
   userCameraOffset.set(0, 0, 0);
   
+  // Get the current planet position
+  const planetPos = new THREE.Vector3();
+  planet.mesh.getWorldPosition(planetPos);
+  
+  // Calculate target camera position
+  const targetCameraPos = planetPos.clone().add(followOffset);
+  
+  // Start smooth camera transition with easing
+  startCameraTransition(targetCameraPos, planetPos, 1.5);
+  
   // Standard follow mode for planets (limited zoom)
   controls.enableZoom = true;
   controls.minDistance = distance * 0.5;
@@ -2431,6 +2505,12 @@ function followMoon(moonMesh, moonData, parentPlanetName) {
   followOffset.set(distance, distance * 0.5, distance);
   lastPlanetPosition.set(0, 0, 0);
   userCameraOffset.set(0, 0, 0);
+  
+  // Get moon position and start smooth camera transition
+  const moonPos = new THREE.Vector3();
+  moonMesh.getWorldPosition(moonPos);
+  const targetCameraPos = moonPos.clone().add(followOffset);
+  startCameraTransition(targetCameraPos, moonPos, 1.5);
   
   // Standard follow mode for moons (limited zoom)
   controls.enableZoom = true;
@@ -2453,13 +2533,15 @@ function followSun() {
   followingType = 'sun';
   followingPlanet = { mesh: sun }; // For compatibility with existing animation loop
   
-  // Set initial camera position
+  // Get sun position
   const sunPos = new THREE.Vector3();
   sun.getWorldPosition(sunPos);
   
-  // Position camera at a good distance from Sun
-  camera.position.set(sunPos.x + 25, sunPos.y + 12, sunPos.z + 25);
-  controls.target.copy(sunPos);
+  // Calculate target camera position at a good distance from Sun
+  const targetCameraPos = new THREE.Vector3(sunPos.x + 25, sunPos.y + 12, sunPos.z + 25);
+  
+  // Start smooth camera transition with easing
+  startCameraTransition(targetCameraPos, sunPos, 1.5);
   
   // Enable zoom controls for Sun following
   controls.enableZoom = true;
@@ -2488,10 +2570,10 @@ function stopFollowingPlanet() {
   lastPlanetPosition.set(0, 0, 0);
   userCameraOffset.set(0, 0, 0);
   
-  // Reset camera position like pressing R key
-  camera.position.set(0, 30, 70);
-  controls.target.set(0, 0, 0);
-  controls.reset();
+  // Smooth transition back to default view
+  const defaultCameraPos = new THREE.Vector3(0, 30, 70);
+  const defaultTarget = new THREE.Vector3(0, 0, 0);
+  startCameraTransition(defaultCameraPos, defaultTarget, 1.5);
   
   // Reset zoom controls to default
   controls.enableZoom = true;
