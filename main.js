@@ -3002,6 +3002,24 @@ function onMouseClick(event) {
       
       // Show information card
       showPlanetInfoCard(body, planetIndex);
+      
+      // Navigate camera to the clicked planet with smooth easing
+      const planet = planetMeshes[planetIndex];
+      if (planet) {
+        const planetPos = new THREE.Vector3();
+        planet.mesh.getWorldPosition(planetPos);
+        
+        // Calculate camera offset based on planet size
+        const distance = Math.max(body.size * 8, 15);
+        const targetCameraPos = new THREE.Vector3(
+          planetPos.x + distance,
+          planetPos.y + distance * 0.5,
+          planetPos.z + distance
+        );
+        
+        // Start smooth camera transition
+        startCameraTransition(targetCameraPos, planetPos, 1.5);
+      }
     }
   } else {
     // Hide info card if clicking on empty space
