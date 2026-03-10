@@ -5,6 +5,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { Lensflare, LensflareElement } from "three/examples/jsm/objects/Lensflare.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 // NASA API Key for real-time planet data
 const NASA_API_KEY = "CH3TuB34hg317ulEggcZCMlKgCCPYQeTzdzJDNCz";
@@ -93,26 +94,44 @@ const skyMat = new THREE.MeshBasicMaterial({
 const skyfield = new THREE.Mesh(skyGeo, skyMat);
 scene.add(skyfield);
 
-// Sun
-const sunMaterial = new THREE.MeshBasicMaterial({
-  map: loader.load("/textures/sun.jpg"),
-  emissive: new THREE.Color(1.5, 1.2, 0.8),
-  emissiveIntensity: 1.8,
-  toneMapped: false,
-  color: new THREE.Color(1.2, 1.1, 0.9)
-});
-const sun = new THREE.Mesh(new THREE.SphereGeometry(5, 64, 64), sunMaterial);
+// Sun (Basketball Model)
+const sun = new THREE.Group();
+sun.position.set(0, 0, 0);
 scene.add(sun);
+
+// Load basketball model to replace the sun
+const gltfLoader = new GLTFLoader();
+gltfLoader.load(
+  "/models/basketball.glb",
+  (gltf) => {
+    const basketball = gltf.scene;
+    basketball.scale.set(5, 5, 5); // Scale to match original sun size
+    basketball.traverse((child) => {
+      if (child.isMesh) {
+        // Enhance materials for visibility
+        child.material.emissive = new THREE.Color(0.3, 0.15, 0.05);
+        child.material.emissiveIntensity = 0.5;
+      }
+    });
+    sun.add(basketball);
+  },
+  (progress) => {
+    console.log("Loading basketball:", (progress.loaded / progress.total) * 100 + "%");
+  },
+  (error) => {
+    console.error("Error loading basketball model:", error);
+  }
+);
 
 // Lens flare
 const textureLoader = new THREE.TextureLoader();
 const textureFlare0 = textureLoader.load("/textures/lensflare0.png");
 const textureFlare2 = textureLoader.load("/textures/lensflare2.png");
 const lensflare = new Lensflare();
-lensflare.addElement(new LensflareElement(textureFlare0, 512, 0, new THREE.Color(1, 0.9, 0.8)));
-lensflare.addElement(new LensflareElement(textureFlare2, 128, 0.2, new THREE.Color(1, 1, 0.6)));
-lensflare.addElement(new LensflareElement(textureFlare2, 64, 0.4, new THREE.Color(0.8, 0.8, 1)));
-lensflare.addElement(new LensflareElement(textureFlare2, 32, 0.6, new THREE.Color(1, 0.8, 0.6)));
+lensflare.addElement(new LensflareElement(textureFlare0, 512, 0, new THREE.Color(1, 0.5, 0.2)));
+lensflare.addElement(new LensflareElement(textureFlare2, 128, 0.2, new THREE.Color(1, 0.6, 0.3)));
+lensflare.addElement(new LensflareElement(textureFlare2, 64, 0.4, new THREE.Color(0.9, 0.5, 0.2)));
+lensflare.addElement(new LensflareElement(textureFlare2, 32, 0.6, new THREE.Color(1, 0.4, 0.1)));
 sun.add(lensflare);
 
 // Fetch asteroid orbital elements from NASA JPL SBDB API
